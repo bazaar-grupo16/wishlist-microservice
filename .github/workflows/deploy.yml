@@ -14,6 +14,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Docker image tag to deploy"
+        required: false
+        default: "latest"
 
 permissions:
   contents: read
@@ -150,9 +155,14 @@ jobs:
       (needs.sast.result == 'success' || needs.sast.result == 'skipped') &&
       (needs.test.result == 'success' || needs.test.result == 'skipped') &&
       (needs.build.result == 'success' || needs.build.result == 'skipped') &&
-      (needs.paths-filter.outputs.app == 'true' || needs.paths-filter.outputs.k8s == 'true') &&
-      github.ref == 'refs/heads/main' &&
-      github.event_name == 'push'
+      (
+        (
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' &&
+          (needs.paths-filter.outputs.app == 'true' || needs.paths-filter.outputs.k8s == 'true')
+        ) ||
+        github.event_name == 'workflow_dispatch'
+      )
     runs-on: ubuntu-latest
 
     steps:
@@ -200,7 +210,7 @@ jobs:
       - name: Deploy application
         env:
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
-          IMAGE_TAG: ${{ needs.paths-filter.outputs.app == 'true' && github.sha || 'latest' }}
+          IMAGE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.image_tag || (needs.paths-filter.outputs.app == 'true' && github.sha || 'latest') }}
         run: |
           envsubst '${IMAGE_NAME} ${IMAGE_TAG}' \
             < k8s/app-deployment.yaml | kubectl apply -f - -n bazaar-dev
