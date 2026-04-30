@@ -1,12 +1,12 @@
 # ──────────────────────────────────────────────────────────────
-# PersistentVolumeClaim — Bazaar PostgreSQL Database
+# PersistentVolumeClaim — Wishlist PostgreSQL Database
 # ──────────────────────────────────────────────────────────────
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: bazaar-db-pvc
+  name: wishlist-db-pvc
   labels:
-    app: bazaar-db
+    app: wishlist-db
 spec:
   accessModes:
     - ReadWriteOnce

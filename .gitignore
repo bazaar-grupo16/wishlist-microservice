@@ -49,6 +49,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 pytestdebug.log
+.codex
 
 # Type checking
 .mypy_cache/

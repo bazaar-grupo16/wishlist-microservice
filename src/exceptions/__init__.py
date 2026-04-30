@@ -1,1 +1,1 @@
-"""Domain exception types for the template microservice"""
+"""Domain exception types for the wishlist microservice."""

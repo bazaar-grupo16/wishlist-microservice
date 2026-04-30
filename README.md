@@ -1,12 +1,12 @@
-# Bazaar — Microservice Template
+# Bazaar — Wishlist Microservice
 
-Template base para microservicios Python / FastAPI del ecosistema **Bazaar**.
+Microservicio Python / FastAPI para wishlist dentro del ecosistema **Bazaar**.
 
 ## Stack
 
 | Capa | Tecnología |
 |------|-----------|
-| Backend | Python 3.11+, FastAPI, Pydantic, SQLAlchemy |
+| Backend | Python 3.12, FastAPI, Pydantic, SQLAlchemy |
 | Base de datos | PostgreSQL (configurable por env vars) |
 | Contenedor | Docker (multi-stage, non-root) |
 | Orquestación | Kubernetes (DigitalOcean) |
@@ -44,7 +44,8 @@ Template base para microservicios Python / FastAPI del ecosistema **Bazaar**.
 │   ├── db-deployment.yaml    # Deployment de PostgreSQL
 │   ├── db-service.yaml       # Service (ClusterIP) de PostgreSQL
 │   ├── db-pvc.yaml           # PersistentVolumeClaim para la BD
-│   └── secret.yaml           # ⚠️ Template — NO commitear valores reales
+│   ├── ingress.yaml          # Ingress path-based para /wishlist
+│   └── secret.yaml           # ⚠️ Plantilla — NO commitear valores reales
 ├── .github/workflows/
 │   ├── ci-dev.yml      # Pipeline CI para la rama dev (lint, SAST, test)
 │   └── deploy.yml
@@ -59,7 +60,7 @@ Template base para microservicios Python / FastAPI del ecosistema **Bazaar**.
 
 ```bash
 # 1. Clonar y entrar al directorio
-git clone <REPO_URL> && cd template-microservice
+git clone <REPO_URL> && cd wishlist-microservice
 
 # 2. Crear entorno virtual
 python -m venv .venv
@@ -127,8 +128,8 @@ docker compose -f docker-compose.test.yml up --build --abort-on-container-exit
 ## Docker
 
 ```bash
-docker build -t template-service .
-docker run -p 8000:8000 --env-file .env template-service
+docker build -t wishlist-service .
+docker run -p 8000:8000 --env-file .env wishlist-service
 ```
 
 ## Kubernetes
@@ -140,11 +141,12 @@ Los manifiestos en `k8s/` despliegan el microservicio junto con su propia base d
 | Secret | Descripción |
 |--------|-------------|
 | `DIGITALOCEAN_ACCESS_TOKEN` | Personal Access Token de DigitalOcean |
+| `DOKS_CLUSTER_NAME` | Nombre del cluster DOKS |
 | `DB_USER` | Usuario de la base de datos |
 | `DB_PASSWORD` | Contraseña de la base de datos |
 | `DB_NAME` | Nombre de la base de datos |
 
-`DB_HOST` y `DB_PORT` están fijos en `k8s/secret.yaml` (`bazaar-db:5432`) ya que la BD corre dentro del cluster.
+`DB_HOST` y `DB_PORT` están fijos en `k8s/secret.yaml` (`wishlist-db:5432`) ya que la BD corre dentro del cluster.
 Si se utilizase una base de datos externa, se deberían agregar las variables de entorno correspondientes.
 
 ### Deploy manual
@@ -157,9 +159,9 @@ kubectl create namespace bazaar-dev
 kubectl apply -f k8s/db-pvc.yaml       -n bazaar-dev
 kubectl apply -f k8s/db-deployment.yaml -n bazaar-dev
 kubectl apply -f k8s/db-service.yaml    -n bazaar-dev
-kubectl apply -f k8s/secret.yaml        -n bazaar-dev
-kubectl apply -f k8s/app-deployment.yaml -n bazaar-dev
 kubectl apply -f k8s/app-service.yaml   -n bazaar-dev
+kubectl apply -f k8s/ingress.yaml       -n bazaar-dev
+envsubst '${IMAGE_NAME} ${IMAGE_TAG}' < k8s/app-deployment.yaml | kubectl apply -f - -n bazaar-dev
 ```
 
 ### CI/CD automático
@@ -187,7 +189,7 @@ Hay dos pipelines de GitHub Actions:
 
 Al iniciar, la aplicación espera a que la base de datos esté disponible usando **backoff exponencial** (1s → 2s → 4s → … hasta 30s por intento, máximo 5 minutos en total) antes de ejecutar las migraciones y aceptar tráfico. Esto evita crasheos durante el arranque del pod cuando la BD aún está inicializándose.
 
-## Extender el template
+## Siguiente iteración
 
 Para agregar una nueva entidad al microservicio:
 

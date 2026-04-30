@@ -9,11 +9,21 @@ on:
     paths:
       - "src/**"
       - "tests/**"
+      - "Dockerfile"
       - "Dockerfile.test"
       - "docker-compose.test.yml"
       - "requirements.txt"
+      - "pyproject.toml"
   pull_request:
     branches: [dev]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "Dockerfile"
+      - "Dockerfile.test"
+      - "docker-compose.test.yml"
+      - "requirements.txt"
+      - "pyproject.toml"
 
 jobs:
   # ── 1. Lint ────────────────────────────────────────────────
@@ -27,7 +37,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Install Ruff
         run: pip install ruff
@@ -47,7 +57,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Install Bandit
         run: pip install bandit

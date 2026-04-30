@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     """Centralised configuration for the microservice."""
 
     # ── Application ──────────────────────────────────
-    APP_NAME: str = "template-service"
+    APP_NAME: str = "wishlist-service"
     LOG_LEVEL: str = "info"
 
     # ── Database ─────────────────────────────────────
@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     DB_USER: str
     DB_PASSWORD: str
     DB_NAME: str
+
+    # ── External services ────────────────────────────
+    CATALOG_SERVICE_URL: str = "http://catalog-service"
 
     # ── Pydantic-settings config ─────────────────────
     model_config = SettingsConfigDict(

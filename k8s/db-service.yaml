@@ -1,16 +1,16 @@
 # ──────────────────────────────────────────────────────────────
-# Kubernetes Service — Bazaar PostgreSQL Database
+# Kubernetes Service — Wishlist PostgreSQL Database
 # ──────────────────────────────────────────────────────────────
 apiVersion: v1
 kind: Service
 metadata:
-  name: bazaar-db
+  name: wishlist-db
   labels:
-    app: bazaar-db
+    app: wishlist-db
 spec:
   type: ClusterIP
   selector:
-    app: bazaar-db
+    app: wishlist-db
   ports:
     - protocol: TCP
       port: 5432
