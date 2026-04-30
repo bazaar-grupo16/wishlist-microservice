@@ -8,7 +8,7 @@ metadata:
   labels:
     app: wishlist-service
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: wishlist-service
@@ -22,6 +22,7 @@ spec:
       containers:
         - name: wishlist-service
           image: $IMAGE_NAME:$IMAGE_TAG
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
           # ── Environment from Kubernetes Secret ──────
@@ -56,11 +57,17 @@ spec:
                   name: wishlist-db-credentials
                   key: DB_NAME
           # ── Probes ─────────────────────────────────
+          startupProbe:
+            httpGet:
+              path: /livez
+              port: 8000
+            periodSeconds: 5
+            failureThreshold: 72
           livenessProbe:
             httpGet:
               path: /livez
               port: 8000
-            initialDelaySeconds: 5
+            initialDelaySeconds: 10
             periodSeconds: 10
           readinessProbe:
             httpGet:
@@ -71,8 +78,8 @@ spec:
           # ── Resources ──────────────────────────────
           resources:
             requests:
-              cpu: 100m
-              memory: 128Mi
+              cpu: 10m
+              memory: 32Mi
             limits:
               cpu: 250m
               memory: 256Mi
