@@ -26,13 +26,13 @@ def _user_headers(user_id: uuid.UUID | None = None, invalid: bool = False) -> di
 
 def _add(client: TestClient, user_id: uuid.UUID, product_id: uuid.UUID):
     return client.post(
-        "/api/v1/wishlist/items",
+        "/items",
         json={"product_id": str(product_id)},
         headers={"X-User-ID": str(user_id)},
     )
 
 
-# ── POST /api/v1/wishlist/items ─────────────────────────────────────────────
+# ── POST /items ──────────────────────────────────────────────────────────────
 
 class TestAddItem:
     def test_add_item_returns_201(self, client: TestClient) -> None:
@@ -48,14 +48,14 @@ class TestAddItem:
 
     def test_add_item_missing_user_header_returns_401(self, client: TestClient) -> None:
         response = client.post(
-            "/api/v1/wishlist/items",
+            "/items",
             json={"product_id": str(uuid.uuid4())},
         )
         assert response.status_code == 401
 
     def test_add_item_invalid_user_id_returns_401(self, client: TestClient) -> None:
         response = client.post(
-            "/api/v1/wishlist/items",
+            "/items",
             json={"product_id": str(uuid.uuid4())},
             headers={"X-User-ID": "not-a-uuid"},
         )
@@ -69,7 +69,7 @@ class TestAddItem:
         assert response.status_code == 409
 
 
-# ── DELETE /api/v1/wishlist/items/{product_id} ──────────────────────────────
+# ── DELETE /items/{product_id} ───────────────────────────────────────────────
 
 class TestRemoveItem:
     def test_remove_item_returns_204(self, client: TestClient) -> None:
@@ -77,7 +77,7 @@ class TestRemoveItem:
         product_id = uuid.uuid4()
         _add(client, user_id, product_id)
         response = client.delete(
-            f"/api/v1/wishlist/items/{product_id}",
+            f"/items/{product_id}",
             headers={"X-User-ID": str(user_id)},
         )
         assert response.status_code == 204
@@ -86,13 +86,13 @@ class TestRemoveItem:
         user_id = uuid.uuid4()
         product_id = uuid.uuid4()
         response = client.delete(
-            f"/api/v1/wishlist/items/{product_id}",
+            f"/items/{product_id}",
             headers={"X-User-ID": str(user_id)},
         )
         assert response.status_code == 404
 
     def test_remove_item_missing_user_header_returns_401(self, client: TestClient) -> None:
-        response = client.delete(f"/api/v1/wishlist/items/{uuid.uuid4()}")
+        response = client.delete(f"/items/{uuid.uuid4()}")
         assert response.status_code == 401
 
     def test_remove_item_only_removes_own_item(self, client: TestClient) -> None:
@@ -104,25 +104,25 @@ class TestRemoveItem:
 
         # user_b removes the item from their own wishlist
         response = client.delete(
-            f"/api/v1/wishlist/items/{product_id}",
+            f"/items/{product_id}",
             headers={"X-User-ID": str(user_b)},
         )
         assert response.status_code == 204
 
         # user_a still has the item
         check = client.get(
-            f"/api/v1/wishlist/items/{product_id}/check",
+            f"/items/{product_id}/check",
             headers={"X-User-ID": str(user_a)},
         )
         assert check.json()["in_wishlist"] is True
 
 
-# ── GET /api/v1/wishlist/items ───────────────────────────────────────────────
+# ── GET /items ────────────────────────────────────────────────────────────────
 
 class TestListItems:
     def test_list_empty_wishlist(self, client: TestClient) -> None:
         response = client.get(
-            "/api/v1/wishlist/items",
+            "/items",
             headers={"X-User-ID": str(uuid.uuid4())},
         )
         assert response.status_code == 200
@@ -131,7 +131,7 @@ class TestListItems:
         assert body["total"] == 0
 
     def test_list_missing_user_header_returns_401(self, client: TestClient) -> None:
-        response = client.get("/api/v1/wishlist/items")
+        response = client.get("/items")
         assert response.status_code == 401
 
     def test_list_catalog_unavailable_degraded_mode(self, client: TestClient) -> None:
@@ -143,7 +143,7 @@ class TestListItems:
             user_id = uuid.uuid4()
             _add(client, user_id, uuid.uuid4())
             response = client.get(
-                "/api/v1/wishlist/items",
+                "/items",
                 headers={"X-User-ID": str(user_id)},
             )
             assert response.status_code == 200
@@ -176,7 +176,7 @@ class TestListItems:
             user_id = uuid.uuid4()
             _add(client, user_id, product_id)
             response = client.get(
-                "/api/v1/wishlist/items",
+                "/items",
                 headers={"X-User-ID": str(user_id)},
             )
             assert response.status_code == 200
@@ -198,7 +198,7 @@ class TestListItems:
         _add(client, user_b, uuid.uuid4())
 
         response = client.get(
-            "/api/v1/wishlist/items",
+            "/items",
             headers={"X-User-ID": str(user_a)},
         )
         assert response.status_code == 200
@@ -208,7 +208,7 @@ class TestListItems:
             assert item["user_id"] == str(user_a)
 
 
-# ── GET /api/v1/wishlist/items/{product_id}/check ───────────────────────────
+# ── GET /items/{product_id}/check ────────────────────────────────────────────
 
 class TestCheckItem:
     def test_check_item_in_wishlist_returns_true(self, client: TestClient) -> None:
@@ -216,7 +216,7 @@ class TestCheckItem:
         product_id = uuid.uuid4()
         _add(client, user_id, product_id)
         response = client.get(
-            f"/api/v1/wishlist/items/{product_id}/check",
+            f"/items/{product_id}/check",
             headers={"X-User-ID": str(user_id)},
         )
         assert response.status_code == 200
@@ -226,14 +226,14 @@ class TestCheckItem:
         user_id = uuid.uuid4()
         product_id = uuid.uuid4()
         response = client.get(
-            f"/api/v1/wishlist/items/{product_id}/check",
+            f"/items/{product_id}/check",
             headers={"X-User-ID": str(user_id)},
         )
         assert response.status_code == 200
         assert response.json()["in_wishlist"] is False
 
     def test_check_item_missing_user_header_returns_401(self, client: TestClient) -> None:
-        response = client.get(f"/api/v1/wishlist/items/{uuid.uuid4()}/check")
+        response = client.get(f"/items/{uuid.uuid4()}/check")
         assert response.status_code == 401
 
     def test_check_item_user_isolation(self, client: TestClient) -> None:
@@ -243,7 +243,7 @@ class TestCheckItem:
         _add(client, user_a, product_id)
 
         response = client.get(
-            f"/api/v1/wishlist/items/{product_id}/check",
+            f"/items/{product_id}/check",
             headers={"X-User-ID": str(user_b)},
         )
         assert response.status_code == 200

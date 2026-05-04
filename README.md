@@ -44,13 +44,17 @@ Microservicio de wishlist para la plataforma Bazaar. Permite a los usuarios guar
 │   ├── exceptions/
 │   │   └── __init__.py          # WishlistItemNotFoundError, WishlistItemAlreadyExistsError
 │   ├── models/
-│   │   └── __init__.py          # WishlistItem ORM (tabla wishlist_items)
+│   │   ├── __init__.py          # Re-export de modelos
+│   │   └── wishlist.py          # WishlistItem ORM (tabla wishlist_items)
 │   ├── repositories/
-│   │   └── __init__.py          # WishlistRepository: add, remove, list_by_user, exists
+│   │   ├── __init__.py          # Re-export de repositorios
+│   │   └── wishlist.py          # WishlistRepository: add, remove, list_by_user, exists
 │   ├── schemas/
-│   │   └── __init__.py          # Pydantic schemas de request y response
+│   │   ├── __init__.py          # Re-export de schemas públicos
+│   │   └── wishlist.py          # Pydantic schemas de request y response
 │   ├── services/
-│   │   └── __init__.py          # WishlistService: orquesta repo + catalog client
+│   │   ├── __init__.py          # Re-export de servicios
+│   │   └── wishlist.py          # WishlistService: orquesta repo + catalog client
 │   └── main.py                  # Punto de entrada, registro de routers
 ├── tests/
 │   ├── conftest.py
@@ -90,9 +94,11 @@ Microservicio de wishlist para la plataforma Bazaar. Permite a los usuarios guar
 
 ### Wishlist
 
-Todos los endpoints requieren el header `X-User-ID: <uuid>` (ver [Autenticación](#autenticación)).
+El Ingress publica estos endpoints bajo el prefijo `/wishlist` y reescribe la request hacia FastAPI sin ese prefijo. Por ejemplo, `GET /wishlist/items` llega internamente como `GET /items`.
 
-#### `POST /api/v1/wishlist/items` — Agregar producto a la wishlist
+Todos los endpoints requieren el header interno `X-User-ID: <uuid>` (ver [Autenticación](#autenticación)). El frontend envía `Authorization: Bearer <token>` y el gateway/auth debe propagar `X-User-ID` al microservicio.
+
+#### `POST /wishlist/items` — Agregar producto a la wishlist
 
 **Body JSON:**
 ```json
@@ -117,7 +123,7 @@ Todos los endpoints requieren el header `X-User-ID: <uuid>` (ver [Autenticación
 
 ---
 
-#### `DELETE /api/v1/wishlist/items/{product_id}` — Quitar producto de la wishlist
+#### `DELETE /wishlist/items/{product_id}` — Quitar producto de la wishlist
 
 **Respuesta `204`:** sin contenido.
 
@@ -129,7 +135,7 @@ Todos los endpoints requieren el header `X-User-ID: <uuid>` (ver [Autenticación
 
 ---
 
-#### `GET /api/v1/wishlist/items` — Listar wishlist del usuario
+#### `GET /wishlist/items` — Listar wishlist del usuario
 
 Devuelve los items de la wishlist enriquecidos con datos del catálogo. Si el catálogo no está disponible, los items igual se devuelven en modo degradado (ver [Integración con catalog-microservice](#integración-con-catalog-microservice)).
 
@@ -161,7 +167,7 @@ Devuelve los items de la wishlist enriquecidos con datos del catálogo. Si el ca
 
 ---
 
-#### `GET /api/v1/wishlist/items/{product_id}/check` — Verificar si un producto está en la wishlist
+#### `GET /wishlist/items/{product_id}/check` — Verificar si un producto está en la wishlist
 
 **Respuesta `200`:**
 ```json
@@ -177,7 +183,7 @@ Devuelve los items de la wishlist enriquecidos con datos del catálogo. Si el ca
 
 ### Autenticación
 
-El API Gateway valida el JWT del cliente y propaga el ID del usuario autenticado como header interno `X-User-ID: <uuid>`. Este microservicio únicamente verifica que el header esté presente y sea un UUID válido — no procesa JWTs directamente.
+El API Gateway valida el JWT recibido como `Authorization: Bearer <token>` y propaga el ID del usuario autenticado como header interno `X-User-ID: <uuid>`. Este microservicio únicamente verifica que el header esté presente y sea un UUID válido — no procesa JWTs directamente.
 
 | Caso | Código | Detalle |
 |------|--------|---------|

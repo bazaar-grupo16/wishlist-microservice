@@ -1,5 +1,5 @@
 """
-Wishlist API router — /api/v1/wishlist/items
+Wishlist API router — /items.
 """
 
 import uuid
@@ -17,7 +17,7 @@ from src.schemas import (
 )
 from src.services import WishlistService
 
-router = APIRouter(prefix="/api/v1/wishlist", tags=["wishlist"])
+router = APIRouter(tags=["wishlist"])
 
 
 def _service(catalog_client=Depends(get_catalog_client)) -> WishlistService:
