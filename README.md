@@ -1,12 +1,26 @@
-# Bazaar — Wishlist Microservice
+# Wishlist Microservice
 
-Microservicio Python / FastAPI para wishlist dentro del ecosistema **Bazaar**.
+Microservicio de wishlist para la plataforma Bazaar. Permite a los usuarios guardar productos favoritos y consultar su lista enriquecida con datos del catálogo en tiempo real. Construido con FastAPI y PostgreSQL.
+
+## Tabla de contenidos
+
+- [Stack](#stack)
+- [Estructura del proyecto](#estructura-del-proyecto)
+- [Endpoints](#endpoints)
+  - [Health](#health)
+  - [Wishlist](#wishlist)
+  - [Autenticación](#autenticación)
+- [Arquitectura en capas](#arquitectura-en-capas)
+- [Integración con catalog-microservice](#integración-con-catalog-microservice)
+- [Variables de entorno](#variables-de-entorno)
+- [Tests](#tests)
+- [CI/CD](#cicd)
 
 ## Stack
 
 | Capa | Tecnología |
 |------|-----------|
-| Backend | Python 3.12, FastAPI, Pydantic, SQLAlchemy |
+| Backend | Python 3.12+, FastAPI, Pydantic, SQLAlchemy |
 | Base de datos | PostgreSQL (configurable por env vars) |
 | Contenedor | Docker (multi-stage, non-root) |
 | Orquestación | Kubernetes (DigitalOcean) |
@@ -17,94 +31,213 @@ Microservicio Python / FastAPI para wishlist dentro del ecosistema **Bazaar**.
 ```
 ├── src/
 │   ├── api/
-│   │   ├── controllers/    # Lógica de manejo de requests
-│   │   ├── routers/        # Definición de rutas FastAPI
-│   │   └── health.py       # /livez y /readyz
-│   ├── core/           # Configuración, DB, logging
-│   │   ├── config.py
-│   │   ├── database.py  # Engine, sesión, base, y retry de conexión
-│   │   ├── dependencies.py
-│   │   ├── logging.py
-│   │   └── utils.py    # Utilidades compartidas
-│   ├── exceptions/     # Tipos de excepción de dominio
-│   ├── models/         # Entidades SQLAlchemy
-│   ├── repositories/   # Acceso a datos
-│   ├── schemas/        # Modelos Pydantic
-│   ├── services/       # Lógica de negocio
-│   └── main.py         # Punto de entrada
+│   │   ├── routers/
+│   │   │   └── wishlist.py      # POST, DELETE, GET list, GET check
+│   │   └── health.py            # /livez y /readyz
+│   ├── core/
+│   │   ├── catalog_client.py    # Cliente HTTP del catalog-service (degraded mode)
+│   │   ├── config.py            # Configuración desde variables de entorno
+│   │   ├── database.py          # Engine, sesión, base declarativa y retry de conexión
+│   │   ├── dependencies.py      # DbSession, UserID, get_catalog_client
+│   │   ├── logging.py           # Logging estructurado JSON
+│   │   └── utils.py             # utc_now()
+│   ├── exceptions/
+│   │   └── __init__.py          # WishlistItemNotFoundError, WishlistItemAlreadyExistsError
+│   ├── models/
+│   │   └── __init__.py          # WishlistItem ORM (tabla wishlist_items)
+│   ├── repositories/
+│   │   └── __init__.py          # WishlistRepository: add, remove, list_by_user, exists
+│   ├── schemas/
+│   │   └── __init__.py          # Pydantic schemas de request y response
+│   ├── services/
+│   │   └── __init__.py          # WishlistService: orquesta repo + catalog client
+│   └── main.py                  # Punto de entrada, registro de routers
 ├── tests/
 │   ├── conftest.py
-│   └── test_health.py
+│   ├── test_health.py
+│   └── test_wishlist.py         # 16 tests de integración contra PostgreSQL real
 ├── scripts/
-│   ├── run_tests.sh    # Wrapper para correr tests (Linux/macOS)
-│   └── run_tests.ps1   # Wrapper para correr tests (Windows)
+│   ├── run_tests.sh             # Wrapper para correr tests (Linux/macOS)
+│   └── run_tests.ps1            # Wrapper para correr tests (Windows)
 ├── k8s/
-│   ├── app-deployment.yaml   # Deployment del microservicio
-│   ├── app-service.yaml      # Service (ClusterIP) del microservicio
-│   ├── db-deployment.yaml    # Deployment de PostgreSQL
-│   ├── db-service.yaml       # Service (ClusterIP) de PostgreSQL
-│   ├── db-pvc.yaml           # PersistentVolumeClaim para la BD
-│   ├── ingress.yaml          # Ingress path-based para /wishlist
-│   └── secret.yaml           # ⚠️ Plantilla — NO commitear valores reales
+│   ├── app-deployment.yaml
+│   ├── app-service.yaml
+│   ├── db-deployment.yaml
+│   ├── db-service.yaml
+│   ├── db-pvc.yaml
+│   ├── ingress.yaml
+│   └── secret.yaml              # ⚠️ Template — NO commitear valores reales
 ├── .github/workflows/
-│   ├── ci-dev.yml      # Pipeline CI para la rama dev (lint, SAST, test)
-│   └── deploy.yml
-├── Dockerfile              # Imagen de producción
-├── Dockerfile.test         # Imagen para correr tests
-├── docker-compose.test.yml # Levanta PostgreSQL + test runner
+│   ├── ci-dev.yml               # Pipeline CI en rama dev
+│   └── deploy.yml               # Pipeline de deploy a DOKS
+├── Dockerfile
+├── Dockerfile.test
+├── docker-compose.test.yml
 ├── requirements.txt
 └── .env.example
 ```
 
-## Setup local
+## Endpoints
 
-```bash
-# 1. Clonar y entrar al directorio
-git clone <REPO_URL> && cd wishlist-microservice
+### Health
 
-# 2. Crear entorno virtual
-python -m venv .venv
-.venv\Scripts\activate        # Windows
-# source .venv/bin/activate   # macOS/Linux
+| Método | Path | Descripción | Respuesta exitosa |
+|--------|------|-------------|-------------------|
+| `GET` | `/livez` | Liveness probe — proceso vivo | `200 {"status": "alive"}` |
+| `GET` | `/readyz` | Readiness probe — BD alcanzable | `200 {"status": "ready"}` / `503 {"status": "unavailable"}` |
 
-# 3. Instalar dependencias
-pip install -r requirements.txt
+---
 
-# 4. Configurar variables de entorno
-cp .env.example .env
-# Editar .env con las credenciales de tu base de datos local
+### Wishlist
 
-# 5. Levantar la aplicación
-uvicorn src.main:app --reload
+Todos los endpoints requieren el header `X-User-ID: <uuid>` (ver [Autenticación](#autenticación)).
+
+#### `POST /api/v1/wishlist/items` — Agregar producto a la wishlist
+
+**Body JSON:**
+```json
+{ "product_id": "b3d1a2c4-1234-5678-abcd-000000000001" }
 ```
 
-## Conectarse al cluster de DigitalOcean
-
-Requisitos:
-- Tener instalado [doctl](https://docs.digitalocean.com/reference/doctl/)
-- Tener instalado [kubectl](https://kubernetes.io/docs/tasks/tools/)
-
-```bash
-# 1. Iniciar sesión en doctl
-doctl auth init --context <NAME>
-doctl auth switch --context <NAME>
-
-# 2. Obtener credenciales del cluster
-doctl kubernetes cluster kubeconfig save <CLUSTER_ID>
+**Respuesta `201`:**
+```json
+{
+  "id": "a1b2c3d4-0000-0000-0000-000000000001",
+  "user_id": "u1u1u1u1-0000-0000-0000-000000000001",
+  "product_id": "b3d1a2c4-1234-5678-abcd-000000000001",
+  "added_at": "2024-01-01T12:00:00Z"
+}
 ```
 
-## Endpoints disponibles
+| Código | Motivo |
+|--------|--------|
+| `201` | Item agregado correctamente |
+| `401` | Header `X-User-ID` ausente o no es un UUID válido |
+| `409` | El producto ya está en la wishlist del usuario |
 
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/livez` | Liveness probe — siempre 200 |
-| GET | `/readyz` | Readiness probe — verifica conexión a DB |
-| GET | `/docs` | Swagger UI (auto-generado) |
-| GET | `/redoc` | ReDoc (auto-generado) |
+---
+
+#### `DELETE /api/v1/wishlist/items/{product_id}` — Quitar producto de la wishlist
+
+**Respuesta `204`:** sin contenido.
+
+| Código | Motivo |
+|--------|--------|
+| `204` | Item eliminado correctamente |
+| `401` | Header `X-User-ID` ausente o inválido |
+| `404` | El producto no está en la wishlist del usuario |
+
+---
+
+#### `GET /api/v1/wishlist/items` — Listar wishlist del usuario
+
+Devuelve los items de la wishlist enriquecidos con datos del catálogo. Si el catálogo no está disponible, los items igual se devuelven en modo degradado (ver [Integración con catalog-microservice](#integración-con-catalog-microservice)).
+
+**Respuesta `200`:**
+```json
+{
+  "items": [
+    {
+      "id": "a1b2c3d4-0000-0000-0000-000000000001",
+      "user_id": "u1u1u1u1-0000-0000-0000-000000000001",
+      "product_id": "b3d1a2c4-1234-5678-abcd-000000000001",
+      "added_at": "2024-01-01T12:00:00Z",
+      "name": "Campera de cuero",
+      "price": 150.0,
+      "image_url": "https://cdn.example.com/img.jpg",
+      "in_stock": true,
+      "is_available": true,
+      "catalog_available": true
+    }
+  ],
+  "total": 1
+}
+```
+
+| Código | Motivo |
+|--------|--------|
+| `200` | Lista devuelta (puede estar vacía) |
+| `401` | Header `X-User-ID` ausente o inválido |
+
+---
+
+#### `GET /api/v1/wishlist/items/{product_id}/check` — Verificar si un producto está en la wishlist
+
+**Respuesta `200`:**
+```json
+{ "in_wishlist": true }
+```
+
+| Código | Motivo |
+|--------|--------|
+| `200` | Verificación exitosa (`in_wishlist: true/false`) |
+| `401` | Header `X-User-ID` ausente o inválido |
+
+---
+
+### Autenticación
+
+El API Gateway valida el JWT del cliente y propaga el ID del usuario autenticado como header interno `X-User-ID: <uuid>`. Este microservicio únicamente verifica que el header esté presente y sea un UUID válido — no procesa JWTs directamente.
+
+| Caso | Código | Detalle |
+|------|--------|---------|
+| Header ausente | `401` | `Missing X-User-ID header` |
+| Valor no-UUID | `401` | `Invalid X-User-ID header` |
+
+## Arquitectura en capas
+
+```
+HTTP Request
+    ↓
+Router          → valida X-User-ID, delega al service
+    ↓
+Service         → orquesta repo + catalog client; lanza excepciones de dominio
+    ├──→ Repository      → único lugar que construye queries SQL
+    │        └──→ PostgreSQL (tabla wishlist_items)
+    └──→ CatalogClient   → GET /api/v1/products/{id} al catalog-microservice
+```
+
+**Regla de dependencias:** cada capa solo conoce a la inmediatamente inferior. El service no importa nada de FastAPI. El router no tiene lógica de negocio ni acceso directo a la base de datos.
+
+**Excepciones de dominio:** el repositorio lanza `WishlistItemNotFoundError` y `WishlistItemAlreadyExistsError`. El router las captura y las convierte a 404 y 409 respectivamente.
+
+## Integración con catalog-microservice
+
+`CatalogClient` (`src/core/catalog_client.py`) realiza `GET /api/v1/products/{product_id}` al catalog-service para enriquecer cada item con nombre, precio, imagen y disponibilidad.
+
+**Degraded mode:** si el catálogo falla por cualquier motivo (timeout de 3s, error HTTP, caída del servicio), el cliente nunca propaga la excepción. Registra un warning y el service devuelve el item con:
+
+```json
+{
+  "catalog_available": false,
+  "name": null,
+  "price": null,
+  "image_url": null,
+  "in_stock": null,
+  "is_available": null
+}
+```
+
+El usuario siempre recibe su lista completa, incluso cuando el catálogo no está disponible.
+
+## Variables de entorno
+
+| Variable | Descripción | Default |
+|----------|-------------|---------|
+| `DB_HOST` | Host de PostgreSQL | — (requerido) |
+| `DB_PORT` | Puerto de PostgreSQL | `5432` |
+| `DB_USER` | Usuario de la base de datos | — (requerido) |
+| `DB_PASSWORD` | Contraseña de la base de datos | — (requerido) |
+| `DB_NAME` | Nombre de la base de datos | — (requerido) |
+| `CATALOG_SERVICE_URL` | URL base del catalog-microservice | `http://catalog-service` |
+| `LOG_LEVEL` | Nivel de logging | `info` |
+| `APP_NAME` | Nombre de la aplicación | `wishlist-service` |
+
+Copiar `.env.example` a `.env` para desarrollo local.
 
 ## Tests
 
-Los tests corren contra una **base de datos PostgreSQL real** usando Docker Compose. No se usa mocking.
+Los tests corren contra una **base de datos PostgreSQL real** usando Docker Compose. No se usa mocking de base de datos. El degraded mode se prueba sobreescribiendo la dependencia `get_catalog_client` con una URL inaccesible.
 
 El archivo `docker-compose.test.yml` levanta:
 1. Un contenedor **PostgreSQL 16** como base de datos.
@@ -119,22 +252,33 @@ El archivo `docker-compose.test.yml` levanta:
 # Windows (PowerShell)
 .\scripts\run_tests.ps1
 
-# O directamente con docker compose
-docker compose -f docker-compose.test.yml up --build --abort-on-container-exit
+# O directamente con docker-compose
+docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from test-runner
+
+# Limpiar contenedores
+docker-compose -f docker-compose.test.yml down -v
 ```
 
-> Los contenedores se limpian automáticamente al finalizar.
+## CI/CD
 
-## Docker
+### `ci-dev.yml` — Pipeline de CI en rama `dev`
 
-```bash
-docker build -t wishlist-service .
-docker run -p 8000:8000 --env-file .env wishlist-service
-```
+Se ejecuta en cada push o PR a `dev` cuando cambian archivos en `src/`, `tests/` o archivos de build.
 
-## Kubernetes
+| Job | Descripción |
+|-----|-------------|
+| `lint` | Ruff sobre `src/` y `tests/` |
+| `sast` | Bandit (análisis estático de seguridad) sobre `src/` |
+| `test` | Tests contra PostgreSQL real vía Docker Compose |
 
-Los manifiestos en `k8s/` despliegan el microservicio junto con su propia base de datos PostgreSQL dentro del cluster.
+### `deploy.yml` — Pipeline de deploy a DOKS en rama `main`
+
+| Job | Se ejecuta cuando cambia... |
+|-----|----------------------------|
+| `lint` | `src/`, `tests/`, archivos de build |
+| `test` | `src/`, `tests/`, archivos de build |
+| `build` | `src/`, `tests/`, archivos de build (solo push a main) |
+| `deploy` | `src/` **o** `k8s/` (solo push a main) |
 
 ### Variables de entorno requeridas (GitHub Secrets)
 
@@ -147,56 +291,7 @@ Los manifiestos en `k8s/` despliegan el microservicio junto con su propia base d
 | `DB_NAME` | Nombre de la base de datos |
 
 `DB_HOST` y `DB_PORT` están fijos en `k8s/secret.yaml` (`wishlist-db:5432`) ya que la BD corre dentro del cluster.
-Si se utilizase una base de datos externa, se deberían agregar las variables de entorno correspondientes.
-
-### Deploy manual
-
-```bash
-# Crear el namespace (solo la primera vez)
-kubectl create namespace bazaar-dev
-
-# Aplicar todos los manifiestos en orden
-kubectl apply -f k8s/db-pvc.yaml       -n bazaar-dev
-kubectl apply -f k8s/db-deployment.yaml -n bazaar-dev
-kubectl apply -f k8s/db-service.yaml    -n bazaar-dev
-kubectl apply -f k8s/app-service.yaml   -n bazaar-dev
-kubectl apply -f k8s/ingress.yaml       -n bazaar-dev
-envsubst '${IMAGE_NAME} ${IMAGE_TAG}' < k8s/app-deployment.yaml | kubectl apply -f - -n bazaar-dev
-```
-
-### CI/CD automático
-
-Hay dos pipelines de GitHub Actions:
-
-**`ci-dev.yml`** — corre en cada push/PR a `dev`:
-
-| Job | Descripción |
-|-----|-------------|
-| `lint` | Ruff sobre `src/` y `tests/` |
-| `sast` | Bandit (análisis estático de seguridad) sobre `src/` |
-| `test` | Tests contra PostgreSQL real vía Docker Compose |
-
-**`deploy.yml`** — corre en cada push a `main`:
-
-| Job | Se ejecuta cuando cambia... |
-|-----|----------------------------|
-| `lint` | `src/`, `tests/`, archivos de build |
-| `test` | `src/`, `tests/`, archivos de build |
-| `build` | `src/`, `tests/`, archivos de build (solo push a main) |
-| `deploy` | `src/` **o** `k8s/` (solo push a main) |
 
 ## Conexión a la base de datos
 
-Al iniciar, la aplicación espera a que la base de datos esté disponible usando **backoff exponencial** (1s → 2s → 4s → … hasta 30s por intento, máximo 5 minutos en total) antes de ejecutar las migraciones y aceptar tráfico. Esto evita crasheos durante el arranque del pod cuando la BD aún está inicializándose.
-
-## Siguiente iteración
-
-Para agregar una nueva entidad al microservicio:
-
-1. Crear el modelo SQLAlchemy en `src/models/`.
-2. Crear los schemas Pydantic en `src/schemas/`.
-3. Implementar el repositorio de acceso a datos en `src/repositories/`.
-4. Definir las excepciones de dominio en `src/exceptions/`.
-5. Implementar la lógica de negocio en `src/services/`.
-6. Crear el controller en `src/api/controllers/` y el router en `src/api/routers/`; incluir el router en `src/main.py`.
-7. Agregar tests en `tests/`.
+Al iniciar, la aplicación espera a que la base de datos esté disponible usando **backoff exponencial** (1s → 2s → 4s → … hasta 30s por intento, máximo 5 minutos en total) antes de crear las tablas y aceptar tráfico. Esto evita crasheos durante el arranque del pod cuando la BD aún está inicializándose.
