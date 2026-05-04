@@ -7,7 +7,6 @@ Each test uses fresh uuid4() values to avoid collisions between runs.
 
 import uuid
 
-import pytest
 from fastapi.testclient import TestClient
 
 from src.core.catalog_client import CatalogClient
