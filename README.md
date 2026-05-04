@@ -55,7 +55,7 @@ Microservicio de wishlist para la plataforma Bazaar. Permite a los usuarios guar
 ├── tests/
 │   ├── conftest.py
 │   ├── test_health.py
-│   └── test_wishlist.py         # 16 tests de integración contra PostgreSQL real
+│   └── test_wishlist.py         # 20 tests de integración contra PostgreSQL real
 ├── scripts/
 │   ├── run_tests.sh             # Wrapper para correr tests (Linux/macOS)
 │   └── run_tests.ps1            # Wrapper para correr tests (Windows)
@@ -194,7 +194,7 @@ Router          → valida X-User-ID, delega al service
 Service         → orquesta repo + catalog client; lanza excepciones de dominio
     ├──→ Repository      → único lugar que construye queries SQL
     │        └──→ PostgreSQL (tabla wishlist_items)
-    └──→ CatalogClient   → GET /api/v1/products/{id} al catalog-microservice
+    └──→ CatalogClient   → GET /products/{id} al catalog-microservice
 ```
 
 **Regla de dependencias:** cada capa solo conoce a la inmediatamente inferior. El service no importa nada de FastAPI. El router no tiene lógica de negocio ni acceso directo a la base de datos.
@@ -203,7 +203,7 @@ Service         → orquesta repo + catalog client; lanza excepciones de dominio
 
 ## Integración con catalog-microservice
 
-`CatalogClient` (`src/core/catalog_client.py`) realiza `GET /api/v1/products/{product_id}` al catalog-service para enriquecer cada item con nombre, precio, imagen y disponibilidad.
+`CatalogClient` (`src/core/catalog_client.py`) realiza `GET /products/{product_id}` al catalog-service para enriquecer cada item con nombre, precio, imagen y disponibilidad.
 
 **Degraded mode:** si el catálogo falla por cualquier motivo (timeout de 3s, error HTTP, caída del servicio), el cliente nunca propaga la excepción. Registra un warning y el service devuelve el item con:
 
