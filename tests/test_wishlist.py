@@ -156,6 +156,41 @@ class TestListItems:
         finally:
             app.dependency_overrides.pop(get_catalog_client, None)
 
+    def test_list_catalog_available_maps_fields_correctly(self, client: TestClient) -> None:
+        product_id = uuid.uuid4()
+
+        class _FakeCatalogClient:
+            def get_product(self, pid: str) -> dict:
+                return {
+                    "data": {
+                        "id": pid,
+                        "title": "Campera de cuero",
+                        "price": 150.0,
+                        "stock": 10,
+                        "status": "active",
+                        "images": ["https://cdn.example.com/img.jpg"],
+                    }
+                }
+
+        app.dependency_overrides[get_catalog_client] = lambda: _FakeCatalogClient()
+        try:
+            user_id = uuid.uuid4()
+            _add(client, user_id, product_id)
+            response = client.get(
+                "/api/v1/wishlist/items",
+                headers={"X-User-ID": str(user_id)},
+            )
+            assert response.status_code == 200
+            item = response.json()["items"][0]
+            assert item["catalog_available"] is True
+            assert item["name"] == "Campera de cuero"
+            assert item["price"] == 150.0
+            assert item["image_url"] == "https://cdn.example.com/img.jpg"
+            assert item["in_stock"] is True
+            assert item["is_available"] is True
+        finally:
+            app.dependency_overrides.pop(get_catalog_client, None)
+
     def test_list_only_returns_own_items(self, client: TestClient) -> None:
         user_a = uuid.uuid4()
         user_b = uuid.uuid4()

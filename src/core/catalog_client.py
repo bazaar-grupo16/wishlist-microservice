@@ -19,7 +19,7 @@ class CatalogClient:
         self._base_url = base_url.rstrip("/")
 
     def get_product(self, product_id: str) -> dict | None:
-        url = f"{self._base_url}/api/v1/products/{product_id}"
+        url = f"{self._base_url}/products/{product_id}"
         try:
             with httpx.Client(timeout=_TIMEOUT) as client:
                 response = client.get(url)

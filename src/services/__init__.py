@@ -32,16 +32,18 @@ class WishlistService:
         for item in items:
             product = self._catalog.get_product(str(item.product_id))
             if product is not None:
+                data = product.get("data", {})
+                images = data.get("images") or []
                 result.append({
                     "id": item.id,
                     "user_id": item.user_id,
                     "product_id": item.product_id,
                     "added_at": item.added_at,
-                    "name": product.get("name"),
-                    "price": product.get("price"),
-                    "image_url": product.get("image_url"),
-                    "in_stock": product.get("in_stock"),
-                    "is_available": product.get("is_available"),
+                    "name": data.get("title"),
+                    "price": data.get("price"),
+                    "image_url": images[0] if images else None,
+                    "in_stock": (data.get("stock") or 0) > 0,
+                    "is_available": data.get("status") == "active",
                     "catalog_available": True,
                 })
             else:
