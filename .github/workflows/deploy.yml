@@ -13,6 +13,17 @@ name: CI/CD
 on:
   push:
     branches: [main]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "Dockerfile"
+      - "Dockerfile.test"
+      - "docker-compose.test.yml"
+      - "k8s/**"
+      - "requirements.txt"
+      - "pyproject.toml"
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       image_tag:
@@ -23,6 +34,7 @@ on:
 permissions:
   contents: read
   packages: write
+  pull-requests: read
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository }}
@@ -57,7 +69,7 @@ jobs:
   lint:
     name: Lint
     needs: paths-filter
-    if: needs.paths-filter.outputs.app == 'true' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'pull_request' || needs.paths-filter.outputs.app == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     steps:
@@ -78,7 +90,7 @@ jobs:
   sast:
     name: Security Check
     needs: [paths-filter, lint]
-    if: needs.paths-filter.outputs.app == 'true' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'pull_request' || needs.paths-filter.outputs.app == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     steps:
@@ -99,7 +111,7 @@ jobs:
   test:
     name: Test
     needs: [paths-filter, lint]
-    if: needs.paths-filter.outputs.app == 'true' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'pull_request' || needs.paths-filter.outputs.app == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     steps:
