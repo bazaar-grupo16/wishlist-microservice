@@ -258,10 +258,14 @@ El archivo `docker-compose.test.yml` levanta:
 # Windows (PowerShell)
 .\scripts\run_tests.ps1
 
-# O directamente con docker-compose
-docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from test-runner
+# O directamente con Docker Compose v2, si está instalado
+docker compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from test-runner
 
 # Limpiar contenedores
+docker compose -f docker-compose.test.yml down -v
+
+# Si tu entorno todavía usa Docker Compose v1
+docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from test-runner
 docker-compose -f docker-compose.test.yml down -v
 ```
 
