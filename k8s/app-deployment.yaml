@@ -22,7 +22,6 @@ spec:
       containers:
         - name: wishlist-service
           image: $IMAGE_NAME:$IMAGE_TAG
-          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
           # ── Environment from Kubernetes Secret ──────
