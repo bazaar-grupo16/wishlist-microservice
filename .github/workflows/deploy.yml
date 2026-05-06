@@ -121,7 +121,10 @@ jobs:
     name: Build & Push
     needs: [paths-filter, sast, test]
     if: |
-      (needs.paths-filter.outputs.app == 'true') &&
+      always() &&
+      (needs.sast.result == 'success' || needs.sast.result == 'skipped') &&
+      (needs.test.result == 'success' || needs.test.result == 'skipped') &&
+      (needs.paths-filter.outputs.app == 'true' || needs.paths-filter.outputs.k8s == 'true') &&
       github.ref == 'refs/heads/main' &&
       github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -201,7 +204,7 @@ jobs:
       - name: Deploy application
         env:
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
-          IMAGE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.image_tag || (needs.paths-filter.outputs.app == 'true' && github.sha || 'latest') }}
+          IMAGE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.image_tag || github.sha }}
         run: |
           envsubst '${IMAGE_NAME} ${IMAGE_TAG}' \
             < k8s/app-deployment.yaml | kubectl apply -f - -n bazaar-dev
