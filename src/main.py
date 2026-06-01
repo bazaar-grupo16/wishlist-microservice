@@ -18,6 +18,8 @@ from src.api.routers.wishlist import router as wishlist_router
 from src.core.config import get_settings
 from src.core.database import Base, engine, wait_for_db
 from src.core.logging import setup_logging
+from src.core.observability import CorrelationIdMiddleware
+from src.core.telemetry import initialize_prometheus_metrics, router as metrics_router
 from src.models import WishlistItem  # noqa: F401 — registers table in Base.metadata
 
 
@@ -29,6 +31,8 @@ logger = logging.getLogger(__name__)
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """Application startup / shutdown lifecycle hook."""
     setup_logging()
+    # Initialize Prometheus metrics (meter provider) early.
+    initialize_prometheus_metrics()
     logger.info("Starting %s", settings.APP_NAME)
     # Wait for the database before creating tables.
     wait_for_db()
@@ -46,5 +50,9 @@ app = FastAPI(
 )
 
 # ── Routers ──────────────────────────────────────────
+app.include_router(metrics_router)
 app.include_router(health_router)
 app.include_router(wishlist_router)
+
+# Correlation id propagation for inbound requests and outbound headers
+app.add_middleware(CorrelationIdMiddleware)

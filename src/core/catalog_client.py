@@ -9,6 +9,9 @@ import logging
 
 import httpx
 
+from src.core.observability import build_observability_headers
+
+
 logger = logging.getLogger(__name__)
 
 _TIMEOUT = 3.0
@@ -21,8 +24,9 @@ class CatalogClient:
     def get_product(self, product_id: str) -> dict | None:
         url = f"{self._base_url}/products/{product_id}"
         try:
+            headers = build_observability_headers()
             with httpx.Client(timeout=_TIMEOUT) as client:
-                response = client.get(url)
+                response = client.get(url, headers=headers)
                 response.raise_for_status()
                 return response.json()
         except Exception as exc:
