@@ -31,6 +31,7 @@ class WishlistItemDetail(BaseModel):
     image_url: str | None = None
     in_stock: bool | None = None
     is_available: bool | None = None
+    is_blocked: bool | None = None
     catalog_available: bool = False
 
     model_config = {"from_attributes": True}

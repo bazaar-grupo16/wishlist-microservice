@@ -44,6 +44,7 @@ class WishlistService:
                     "image_url": images[0] if images else None,
                     "in_stock": (data.get("stock") or 0) > 0,
                     "is_available": data.get("status") == "active",
+                    "is_blocked": data.get("adminDisabled") is True,
                     "catalog_available": True,
                 })
             else:
@@ -57,6 +58,7 @@ class WishlistService:
                     "image_url": None,
                     "in_stock": None,
                     "is_available": None,
+                    "is_blocked": None,
                     "catalog_available": False,
                 })
         return result
